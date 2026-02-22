@@ -44,7 +44,7 @@ def init_google_sheets():
         creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
         client = gspread.authorize(creds)
 
-        spreadsheet = client.open("AgentT User Data")
+        spreadsheet = client.open_by_key("16AhEs5OlDGYl3eu36Ls1yEPFS8FkrtkH0EVPqbzpXts")
         sheet = spreadsheet.sheet1
 
         # Add headers if sheet is empty

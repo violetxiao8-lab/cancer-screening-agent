@@ -1,5 +1,5 @@
 .env
 venv/
-knowledge_base/
+
 __pycache__/
 *.pyc

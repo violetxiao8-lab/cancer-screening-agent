@@ -59,7 +59,9 @@ def init_google_sheets():
 
         print("✅ Google Sheets connected successfully!")
     except Exception as e:
+        import traceback
         print(f"⚠️ Google Sheets connection failed: {e}")
+        print(traceback.format_exc())
         sheet = None
 
 def log_to_sheets(request, reply):

@@ -30,7 +30,6 @@ sheet = None
 def init_google_sheets():
     global sheet
     try:
-        # Load credentials from environment variable (JSON string)
         creds_json = os.environ.get("GOOGLE_CREDENTIALS_JSON")
         if not creds_json:
             print("⚠️ GOOGLE_CREDENTIALS_JSON not set, skipping Sheets integration")
@@ -47,13 +46,12 @@ def init_google_sheets():
         spreadsheet = client.open_by_key("16AhEs5OlDGYl3eu36Ls1yEPFS8FkrtkH0EVPqbzpXts")
         sheet = spreadsheet.sheet1
 
-        # Add headers if sheet is empty
-        if sheet.row_count == 0 or sheet.cell(1, 1).value is None:
+        if not sheet.cell(1, 1).value:
             headers = [
-                "Timestamp", "Age", "Gender", "Ethnicity",
+                "Session ID", "Timestamp", "Age", "Gender", "Ethnicity",
                 "Family History", "Prior Screening", "Smoking",
-                "Alcohol", "Activity", "Community",
-                "User Question", "AgentT Answer"
+                "Alcohol", "Community",
+                "Q1", "A1"
             ]
             sheet.append_row(headers)
 
@@ -69,21 +67,37 @@ def log_to_sheets(request, reply):
     if not sheet:
         return
     try:
-        row = [
-            datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            request.age or "",
-            request.gender or "",
-            request.ethnicity or "",
-            request.family_history or "",
-            request.prior_screening or "",
-            request.smoking or "",
-            request.alcohol or "",
-            request.activity or "",
-            request.community or "",
-            request.message,
-            reply
-        ]
-        sheet.append_row(row)
+        session_id = request.session_id or "unknown"
+        all_values = sheet.get_all_values()
+
+        row_index = None
+        for i, row in enumerate(all_values[1:], start=2):
+            if row and row[0] == session_id:
+                row_index = i
+                break
+
+        if row_index is None:
+            new_row = [
+                session_id,
+                datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                request.age or "",
+                request.gender or "",
+                request.ethnicity or "",
+                request.family_history or "",
+                request.prior_screening or "",
+                request.smoking or "",
+                request.alcohol or "",
+                request.community or "",
+                request.message,
+                reply
+            ]
+            sheet.append_row(new_row)
+        else:
+            existing_row = all_values[row_index - 1]
+            next_col = len(existing_row) + 1
+            sheet.update_cell(row_index, next_col, request.message)
+            sheet.update_cell(row_index, next_col + 1, reply)
+
     except Exception as e:
         print(f"⚠️ Failed to log to Sheets: {e}")
 
@@ -104,6 +118,7 @@ async def startup_event():
 
 class ChatRequest(BaseModel):
     message: str
+    session_id: Optional[str] = None
     age: Optional[int] = None
     gender: Optional[str] = None
     ethnicity: Optional[str] = "Chinese American"
@@ -166,7 +181,6 @@ Context from knowledge base:
         response = llm.invoke(messages)
         reply = response.content if hasattr(response, 'content') else str(response)
 
-        # Log to Google Sheets
         log_to_sheets(request, reply)
 
         return ChatResponse(reply=reply, status="success")

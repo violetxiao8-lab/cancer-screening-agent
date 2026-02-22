@@ -1,0 +1,11 @@
+openai
+langchain
+langchain-community
+langchain-openai
+langchain-text-splitters
+chromadb
+pypdf
+youtube-transcript-api
+python-dotenv
+streamlit
+tiktoken

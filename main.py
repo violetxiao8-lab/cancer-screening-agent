@@ -7,6 +7,7 @@ import json
 import datetime
 import random
 import smtplib
+import socket
 from email.mime.text import MIMEText
 from dotenv import load_dotenv
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
@@ -71,7 +72,18 @@ This code expires in {OTP_EXPIRY_MINUTES} minutes. If you didn't request this, y
     msg["From"] = GMAIL_ADDRESS
     msg["To"] = to_email
 
-    with smtplib.SMTP("smtp.gmail.com", 587) as server:
+    # Force IPv4 — some hosts (e.g. Railway) fail with "Network is unreachable"
+    # when smtplib tries Gmail's IPv6 address first.
+    class IPv4SMTP(smtplib.SMTP):
+        def _get_socket(self, host, port, timeout):
+            addr_info = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)
+            sock = socket.socket(addr_info[0][0], addr_info[0][1], addr_info[0][2])
+            if timeout is not None and timeout != socket._GLOBAL_DEFAULT_TIMEOUT:
+                sock.settimeout(timeout)
+            sock.connect(addr_info[0][4])
+            return sock
+
+    with IPv4SMTP("smtp.gmail.com", 587, timeout=15) as server:
         server.starttls()
         server.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
         server.sendmail(GMAIL_ADDRESS, [to_email], msg.as_string())

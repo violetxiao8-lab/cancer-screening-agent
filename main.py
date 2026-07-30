@@ -1,15 +1,19 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 import os
 import json
 import datetime
+import random
+import smtplib
+from email.mime.text import MIMEText
 from dotenv import load_dotenv
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_community.vectorstores import Chroma
 import gspread
 from google.oauth2.service_account import Credentials
+import jwt
 
 load_dotenv()
 
@@ -26,6 +30,132 @@ app.add_middleware(
 vectorstore = None
 llm = None
 sheet = None
+
+# ---------------------------------------------------------------------------
+# OTP AUTH CONFIG
+# ---------------------------------------------------------------------------
+
+ALLOWED_EMAILS = [
+    e.strip().lower()
+    for e in os.environ.get("ALLOWED_EMAILS", "").split(",")
+    if e.strip()
+]
+
+GMAIL_ADDRESS = os.environ.get("GMAIL_ADDRESS")
+GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD")
+JWT_SECRET = os.environ.get("JWT_SECRET", "change-this-secret-in-production")
+OTP_EXPIRY_MINUTES = 10
+TOKEN_EXPIRY_HOURS = 24
+
+# In-memory OTP store: { email: {"code": "123456", "expires_at": datetime} }
+# NOTE: this resets if the server restarts, and won't work across multiple
+# replicas. Fine for a demo / single-instance deploy.
+otp_store = {}
+
+
+def send_otp_email(to_email: str, code: str):
+    if not GMAIL_ADDRESS or not GMAIL_APP_PASSWORD:
+        raise RuntimeError("GMAIL_ADDRESS / GMAIL_APP_PASSWORD not configured")
+
+    subject = "Your AgentT login code"
+    body = f"""Hi,
+
+Your 5-digit one-time login code for AgentT is:
+
+    {code}
+
+This code expires in {OTP_EXPIRY_MINUTES} minutes. If you didn't request this, you can ignore this email.
+"""
+    msg = MIMEText(body)
+    msg["Subject"] = subject
+    msg["From"] = GMAIL_ADDRESS
+    msg["To"] = to_email
+
+    with smtplib.SMTP("smtp.gmail.com", 587) as server:
+        server.starttls()
+        server.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
+        server.sendmail(GMAIL_ADDRESS, [to_email], msg.as_string())
+
+
+def create_access_token(email: str) -> str:
+    payload = {
+        "email": email,
+        "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=TOKEN_EXPIRY_HOURS),
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
+
+
+def get_current_user(authorization: Optional[str] = Header(None)) -> str:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
+
+    token = authorization.split(" ", 1)[1]
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired, please log in again")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    email = payload.get("email")
+    if not email or email.lower() not in ALLOWED_EMAILS:
+        raise HTTPException(status_code=401, detail="Not authorized")
+
+    return email
+
+
+class RequestOtpBody(BaseModel):
+    email: str
+
+
+class VerifyOtpBody(BaseModel):
+    email: str
+    code: str
+
+
+@app.post("/auth/request-otp")
+def request_otp(body: RequestOtpBody):
+    email = body.email.strip().lower()
+
+    if email not in ALLOWED_EMAILS:
+        raise HTTPException(status_code=403, detail="This email is not authorized to access AgentT")
+
+    code = f"{random.randint(0, 99999):05d}"
+    expires_at = datetime.datetime.utcnow() + datetime.timedelta(minutes=OTP_EXPIRY_MINUTES)
+    otp_store[email] = {"code": code, "expires_at": expires_at}
+
+    try:
+        send_otp_email(email, code)
+    except Exception as e:
+        print(f"⚠️ Failed to send OTP email: {e}")
+        raise HTTPException(status_code=500, detail="Failed to send OTP email")
+
+    return {"status": "sent", "message": f"A login code was sent to {email}"}
+
+
+@app.post("/auth/verify-otp")
+def verify_otp(body: VerifyOtpBody):
+    email = body.email.strip().lower()
+    entry = otp_store.get(email)
+
+    if not entry:
+        raise HTTPException(status_code=400, detail="No OTP requested for this email")
+
+    if datetime.datetime.utcnow() > entry["expires_at"]:
+        del otp_store[email]
+        raise HTTPException(status_code=400, detail="Code expired, please request a new one")
+
+    if body.code.strip() != entry["code"]:
+        raise HTTPException(status_code=400, detail="Incorrect code")
+
+    del otp_store[email]
+    token = create_access_token(email)
+    return {"status": "success", "token": token}
+
+
+# ---------------------------------------------------------------------------
+# EXISTING APP LOGIC
+# ---------------------------------------------------------------------------
 
 def init_google_sheets():
     global sheet
@@ -143,7 +273,7 @@ def health():
     return {"status": "healthy"}
 
 @app.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest, current_user: str = Depends(get_current_user)):
     try:
         context = ""
         if vectorstore:

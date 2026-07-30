@@ -40,8 +40,8 @@ ALLOWED_EMAILS = [
     if e.strip()
 ]
 
-RESEND_API_KEY = os.environ.get("RESEND_API_KEY")
-RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "onboarding@resend.dev")
+SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY")
+SENDGRID_FROM_EMAIL = os.environ.get("SENDGRID_FROM_EMAIL", "mashiatjamal91@gmail.com")
 JWT_SECRET = os.environ.get("JWT_SECRET", "change-this-secret-in-production")
 OTP_EXPIRY_MINUTES = 10
 TOKEN_EXPIRY_HOURS = 24
@@ -53,8 +53,8 @@ otp_store = {}
 
 
 def send_otp_email(to_email: str, code: str):
-    if not RESEND_API_KEY:
-        raise RuntimeError("RESEND_API_KEY not configured")
+    if not SENDGRID_API_KEY:
+        raise RuntimeError("SENDGRID_API_KEY not configured")
 
     body_html = f"""
     <p>Hi,</p>
@@ -64,22 +64,22 @@ def send_otp_email(to_email: str, code: str):
     """
 
     response = requests.post(
-        "https://api.resend.com/emails",
+        "https://api.sendgrid.com/v3/mail/send",
         headers={
-            "Authorization": f"Bearer {RESEND_API_KEY}",
+            "Authorization": f"Bearer {SENDGRID_API_KEY}",
             "Content-Type": "application/json",
         },
         json={
-            "from": f"AgentT <{RESEND_FROM_EMAIL}>",
-            "to": [to_email],
+            "personalizations": [{"to": [{"email": to_email}]}],
+            "from": {"email": SENDGRID_FROM_EMAIL, "name": "AgentT"},
             "subject": "Your AgentT login code",
-            "html": body_html,
+            "content": [{"type": "text/html", "value": body_html}],
         },
         timeout=15,
     )
 
-    if response.status_code >= 400:
-        raise RuntimeError(f"Resend API error {response.status_code}: {response.text}")
+    if response.status_code >= 300:
+        raise RuntimeError(f"SendGrid API error {response.status_code}: {response.text}")
 
 
 def create_access_token(email: str) -> str:

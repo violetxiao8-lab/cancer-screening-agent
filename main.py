@@ -40,8 +40,8 @@ ALLOWED_EMAILS = [
     if e.strip()
 ]
 
-BREVO_API_KEY = os.environ.get("BREVO_API_KEY")
-BREVO_SENDER_EMAIL = os.environ.get("BREVO_SENDER_EMAIL", "mashiatjamal91@gmail.com")
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY")
+RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "onboarding@resend.dev")
 JWT_SECRET = os.environ.get("JWT_SECRET", "change-this-secret-in-production")
 OTP_EXPIRY_MINUTES = 10
 TOKEN_EXPIRY_HOURS = 24
@@ -53,8 +53,8 @@ otp_store = {}
 
 
 def send_otp_email(to_email: str, code: str):
-    if not BREVO_API_KEY:
-        raise RuntimeError("BREVO_API_KEY not configured")
+    if not RESEND_API_KEY:
+        raise RuntimeError("RESEND_API_KEY not configured")
 
     body_html = f"""
     <p>Hi,</p>
@@ -64,23 +64,22 @@ def send_otp_email(to_email: str, code: str):
     """
 
     response = requests.post(
-        "https://api.brevo.com/v3/smtp/email",
+        "https://api.resend.com/emails",
         headers={
-            "accept": "application/json",
-            "api-key": BREVO_API_KEY,
-            "content-type": "application/json",
+            "Authorization": f"Bearer {RESEND_API_KEY}",
+            "Content-Type": "application/json",
         },
         json={
-            "sender": {"email": BREVO_SENDER_EMAIL, "name": "AgentT"},
-            "to": [{"email": to_email}],
+            "from": f"AgentT <{RESEND_FROM_EMAIL}>",
+            "to": [to_email],
             "subject": "Your AgentT login code",
-            "htmlContent": body_html,
+            "html": body_html,
         },
         timeout=15,
     )
 
-    if response.status_code >= 300:
-        raise RuntimeError(f"Brevo API error {response.status_code}: {response.text}")
+    if response.status_code >= 400:
+        raise RuntimeError(f"Resend API error {response.status_code}: {response.text}")
 
 
 def create_access_token(email: str) -> str:

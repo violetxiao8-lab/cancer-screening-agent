@@ -40,8 +40,8 @@ ALLOWED_EMAILS = [
     if e.strip()
 ]
 
-SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY")
-SENDGRID_FROM_EMAIL = os.environ.get("SENDGRID_FROM_EMAIL", "mashiatjamal91@gmail.com")
+SENDGRID_API_KEY = (os.environ.get("SENDGRID_API_KEY") or "").strip()
+SENDGRID_FROM_EMAIL = (os.environ.get("SENDGRID_FROM_EMAIL") or "mashiatjamal91@gmail.com").strip()
 JWT_SECRET = os.environ.get("JWT_SECRET", "change-this-secret-in-production")
 OTP_EXPIRY_MINUTES = 10
 TOKEN_EXPIRY_HOURS = 24

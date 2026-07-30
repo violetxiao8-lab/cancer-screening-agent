@@ -6,9 +6,7 @@ import os
 import json
 import datetime
 import random
-import smtplib
-import socket
-from email.mime.text import MIMEText
+import requests
 from dotenv import load_dotenv
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_community.vectorstores import Chroma
@@ -42,8 +40,8 @@ ALLOWED_EMAILS = [
     if e.strip()
 ]
 
-GMAIL_ADDRESS = os.environ.get("GMAIL_ADDRESS")
-GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD")
+BREVO_API_KEY = os.environ.get("BREVO_API_KEY")
+BREVO_SENDER_EMAIL = os.environ.get("BREVO_SENDER_EMAIL", "mashiatjamal91@gmail.com")
 JWT_SECRET = os.environ.get("JWT_SECRET", "change-this-secret-in-production")
 OTP_EXPIRY_MINUTES = 10
 TOKEN_EXPIRY_HOURS = 24
@@ -55,38 +53,34 @@ otp_store = {}
 
 
 def send_otp_email(to_email: str, code: str):
-    if not GMAIL_ADDRESS or not GMAIL_APP_PASSWORD:
-        raise RuntimeError("GMAIL_ADDRESS / GMAIL_APP_PASSWORD not configured")
+    if not BREVO_API_KEY:
+        raise RuntimeError("BREVO_API_KEY not configured")
 
-    subject = "Your AgentT login code"
-    body = f"""Hi,
+    body_html = f"""
+    <p>Hi,</p>
+    <p>Your 5-digit one-time login code for AgentT is:</p>
+    <h2>{code}</h2>
+    <p>This code expires in {OTP_EXPIRY_MINUTES} minutes. If you didn't request this, you can ignore this email.</p>
+    """
 
-Your 5-digit one-time login code for AgentT is:
+    response = requests.post(
+        "https://api.brevo.com/v3/smtp/email",
+        headers={
+            "accept": "application/json",
+            "api-key": BREVO_API_KEY,
+            "content-type": "application/json",
+        },
+        json={
+            "sender": {"email": BREVO_SENDER_EMAIL, "name": "AgentT"},
+            "to": [{"email": to_email}],
+            "subject": "Your AgentT login code",
+            "htmlContent": body_html,
+        },
+        timeout=15,
+    )
 
-    {code}
-
-This code expires in {OTP_EXPIRY_MINUTES} minutes. If you didn't request this, you can ignore this email.
-"""
-    msg = MIMEText(body)
-    msg["Subject"] = subject
-    msg["From"] = GMAIL_ADDRESS
-    msg["To"] = to_email
-
-    # Force IPv4 — some hosts (e.g. Railway) fail with "Network is unreachable"
-    # when smtplib tries Gmail's IPv6 address first.
-    class IPv4SMTP(smtplib.SMTP):
-        def _get_socket(self, host, port, timeout):
-            addr_info = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)
-            sock = socket.socket(addr_info[0][0], addr_info[0][1], addr_info[0][2])
-            if timeout is not None and timeout != socket._GLOBAL_DEFAULT_TIMEOUT:
-                sock.settimeout(timeout)
-            sock.connect(addr_info[0][4])
-            return sock
-
-    with IPv4SMTP("smtp.gmail.com", 587, timeout=15) as server:
-        server.starttls()
-        server.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
-        server.sendmail(GMAIL_ADDRESS, [to_email], msg.as_string())
+    if response.status_code >= 300:
+        raise RuntimeError(f"Brevo API error {response.status_code}: {response.text}")
 
 
 def create_access_token(email: str) -> str:

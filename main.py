@@ -162,6 +162,20 @@ def verify_otp(body: VerifyOtpBody):
 # EXISTING APP LOGIC
 # ---------------------------------------------------------------------------
 
+SHEET_HEADERS = [
+    "Session ID", "Participant Email", "Participant ID (Prolific)", "Timestamp",
+    "Message Index", "Age", "Gender", "Ethnicity", "Family History",
+    "Prior Screening", "Smoking", "Alcohol", "Community", "Question", "Answer",
+]
+
+# Tracks how many messages we've seen per session_id during this server's
+# runtime, so "Message Index" is meaningful without re-reading the sheet.
+# NOTE: like otp_store, this resets on restart. If you need Message Index to
+# survive restarts, derive it from the sheet later during analysis instead
+# of relying on this counter.
+session_message_counts = {}
+
+
 def init_google_sheets():
     global sheet
     try:
@@ -181,14 +195,10 @@ def init_google_sheets():
         spreadsheet = client.open_by_key("16AhEs5OlDGYl3eu36Ls1yEPFS8FkrtkH0EVPqbzpXts")
         sheet = spreadsheet.sheet1
 
-        if not sheet.cell(1, 1).value:
-            headers = [
-                "Session ID", "Timestamp", "Age", "Gender", "Ethnicity",
-                "Family History", "Prior Screening", "Smoking",
-                "Alcohol", "Community",
-                "Q1", "A1"
-            ]
-            sheet.append_row(headers)
+        existing_header = sheet.row_values(1)
+        if existing_header != SHEET_HEADERS:
+            # Only overwrite the header row itself — never touch existing data rows.
+            sheet.update("A1", [SHEET_HEADERS])
 
         print("✅ Google Sheets connected successfully!")
     except Exception as e:
@@ -197,41 +207,37 @@ def init_google_sheets():
         print(traceback.format_exc())
         sheet = None
 
-def log_to_sheets(request, reply):
+
+def log_to_sheets(request, reply, user_email):
+    """Append ONE row per message. No reads, no cell-by-cell updates —
+    just a fast, append-only write so the sheet stays a clean flat log
+    that's trivial to pivot/filter for engagement analysis."""
     global sheet
     if not sheet:
         return
     try:
         session_id = request.session_id or "unknown"
-        all_values = sheet.get_all_values()
+        session_message_counts[session_id] = session_message_counts.get(session_id, 0) + 1
+        message_index = session_message_counts[session_id]
 
-        row_index = None
-        for i, row in enumerate(all_values[1:], start=2):
-            if row and row[0] == session_id:
-                row_index = i
-                break
-
-        if row_index is None:
-            new_row = [
-                session_id,
-                datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                request.age or "",
-                request.gender or "",
-                request.ethnicity or "",
-                request.family_history or "",
-                request.prior_screening or "",
-                request.smoking or "",
-                request.alcohol or "",
-                request.community or "",
-                request.message,
-                reply
-            ]
-            sheet.append_row(new_row)
-        else:
-            existing_row = all_values[row_index - 1]
-            next_col = len(existing_row) + 1
-            sheet.update_cell(row_index, next_col, request.message)
-            sheet.update_cell(row_index, next_col + 1, reply)
+        new_row = [
+            session_id,
+            user_email or "",
+            request.participant_id or "",
+            datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            message_index,
+            request.age or "",
+            request.gender or "",
+            request.ethnicity or "",
+            request.family_history or "",
+            request.prior_screening or "",
+            request.smoking or "",
+            request.alcohol or "",
+            request.community or "",
+            request.message,
+            reply,
+        ]
+        sheet.append_row(new_row)
 
     except Exception as e:
         print(f"⚠️ Failed to log to Sheets: {e}")
@@ -254,6 +260,7 @@ async def startup_event():
 class ChatRequest(BaseModel):
     message: str
     session_id: Optional[str] = None
+    participant_id: Optional[str] = None  # e.g. Prolific ID, if collected client-side
     age: Optional[int] = None
     gender: Optional[str] = None
     ethnicity: Optional[str] = "Chinese American"
@@ -316,7 +323,7 @@ Context from knowledge base:
         response = llm.invoke(messages)
         reply = response.content if hasattr(response, 'content') else str(response)
 
-        log_to_sheets(request, reply)
+        log_to_sheets(request, reply, current_user)
 
         return ChatResponse(reply=reply, status="success")
 

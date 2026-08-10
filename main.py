@@ -14,6 +14,8 @@ import gspread
 from google.oauth2.service_account import Credentials
 import jwt
 
+from analytics_core import compute_engagement_summary
+
 load_dotenv()
 
 app = FastAPI(title="AgentT Cancer Screening API")
@@ -37,6 +39,14 @@ sheet = None
 ALLOWED_EMAILS = [
     e.strip().lower()
     for e in os.environ.get("ALLOWED_EMAILS", "").split(",")
+    if e.strip()
+]
+
+# Admins must ALSO be in ALLOWED_EMAILS to log in at all (same OTP flow).
+# ADMIN_EMAILS is just an extra permission flag checked on top of that.
+ADMIN_EMAILS = [
+    e.strip().lower()
+    for e in os.environ.get("ADMIN_EMAILS", "").split(",")
     if e.strip()
 ]
 
@@ -107,6 +117,12 @@ def get_current_user(authorization: Optional[str] = Header(None)) -> str:
         raise HTTPException(status_code=401, detail="Not authorized")
 
     return email
+
+
+def get_current_admin(current_user: str = Depends(get_current_user)) -> str:
+    if current_user.lower() not in ADMIN_EMAILS:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return current_user
 
 
 class RequestOtpBody(BaseModel):
@@ -333,3 +349,19 @@ Context from knowledge base:
             reply="I'm having trouble connecting right now. Please try again in a moment!",
             status="error"
         )
+
+
+@app.get("/admin/analytics")
+def admin_analytics(current_admin: str = Depends(get_current_admin)):
+    """Admin-only: returns the same engagement summary as analytics_summary.py,
+    as JSON, so an admin panel button can call this directly instead of
+    someone having to run the script by hand."""
+    if not sheet:
+        raise HTTPException(status_code=503, detail="Sheet not connected")
+
+    try:
+        rows = sheet.get_all_records()
+        summary = compute_engagement_summary(rows, ALLOWED_EMAILS)
+        return summary
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to compute analytics: {e}")

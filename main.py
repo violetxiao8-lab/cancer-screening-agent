@@ -6,7 +6,23 @@ from fastapi import FastAPI, Depends, HTTPException, Header
 
 
 
+
+
+
+
+
+
+
+
 from fastapi.middleware.cors import CORSMiddleware
+
+
+
+
+
+
+
+
 
 
 
@@ -22,7 +38,23 @@ from pydantic import BaseModel
 
 
 
+
+
+
+
+
+
+
+
 from typing import Optional
+
+
+
+
+
+
+
+
 
 
 
@@ -38,7 +70,23 @@ import os
 
 
 
+
+
+
+
+
+
+
+
 import json
+
+
+
+
+
+
+
+
 
 
 
@@ -54,11 +102,40 @@ import datetime
 
 
 
+
+
+
+
+
+
+
+
 import hmac
+
+
 
 import uuid
 
+
+
 import threading
+import re
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -82,7 +159,23 @@ from dotenv import load_dotenv
 
 
 
+
+
+
+
+
+
+
+
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+
+
+
+
+
+
+
+
 
 
 
@@ -98,7 +191,23 @@ from langchain_community.vectorstores import Chroma
 
 
 
+
+
+
+
+
+
+
+
 import gspread
+
+
+
+
+
+
+
+
 
 
 
@@ -114,7 +223,31 @@ from google.oauth2.service_account import Credentials
 
 
 
+
+
+
+
+
+
+
+
 import jwt
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -154,7 +287,47 @@ from analytics_core import compute_engagement_summary
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 load_dotenv()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -194,7 +367,39 @@ app = FastAPI(title="AgentT Cancer Screening API")
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # ---------------------------------------------------------------------------
+
+
+
+
+
+
+
+
 
 
 
@@ -210,7 +415,31 @@ app = FastAPI(title="AgentT Cancer Screening API")
 
 
 
+
+
+
+
+
+
+
+
 # ---------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -234,7 +463,23 @@ app.add_middleware(
 
 
 
+
+
+
+
+
+
+
+
     CORSMiddleware,
+
+
+
+
+
+
+
+
 
 
 
@@ -250,7 +495,23 @@ app.add_middleware(
 
 
 
+
+
+
+
+
+
+
+
     allow_credentials=True,
+
+
+
+
+
+
+
+
 
 
 
@@ -266,7 +527,23 @@ app.add_middleware(
 
 
 
+
+
+
+
+
+
+
+
     allow_headers=["*"],
+
+
+
+
+
+
+
+
 
 
 
@@ -298,7 +575,39 @@ app.add_middleware(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # ---------------------------------------------------------------------------
+
+
+
+
+
+
+
+
 
 
 
@@ -314,7 +623,31 @@ app.add_middleware(
 
 
 
+
+
+
+
+
+
+
+
 # ---------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -338,7 +671,23 @@ vectorstore = None
 
 
 
+
+
+
+
+
+
+
+
 llm = None
+
+
+
+
+
+
+
+
 
 
 
@@ -370,7 +719,39 @@ sheet = None
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # ---------------------------------------------------------------------------
+
+
+
+
+
+
+
+
 
 
 
@@ -386,7 +767,31 @@ sheet = None
 
 
 
+
+
+
+
+
+
+
+
 # ---------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -410,7 +815,23 @@ ALLOWED_EMAILS = [
 
 
 
+
+
+
+
+
+
+
+
     e.strip().lower()
+
+
+
+
+
+
+
+
 
 
 
@@ -426,6 +847,14 @@ ALLOWED_EMAILS = [
 
 
 
+
+
+
+
+
+
+
+
     if e.strip()
 
 
@@ -434,7 +863,31 @@ ALLOWED_EMAILS = [
 
 
 
+
+
+
+
+
+
+
+
 ]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -458,7 +911,23 @@ ADMIN_EMAILS = [
 
 
 
+
+
+
+
+
+
+
+
     e.strip().lower()
+
+
+
+
+
+
+
+
 
 
 
@@ -474,7 +943,23 @@ ADMIN_EMAILS = [
 
 
 
+
+
+
+
+
+
+
+
     if e.strip()
+
+
+
+
+
+
+
+
 
 
 
@@ -498,7 +983,72 @@ ADMIN_EMAILS = [
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Admin-managed participant access.
+# Mount a Railway Volume at /data so additions survive redeploys.
+ACCESS_STORE_PATH = os.environ.get("ACCESS_STORE_PATH", "/data/agentt_access.json")
+access_store_lock = threading.Lock()
+
+def normalize_email(value: str) -> str:
+    return (value or "").strip().lower()
+
+def is_valid_email(value: str) -> bool:
+    return bool(re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", normalize_email(value)))
+
+def load_managed_participant_emails():
+    try:
+        if not ACCESS_STORE_PATH or not os.path.exists(ACCESS_STORE_PATH):
+            return []
+        with open(ACCESS_STORE_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        emails = data.get("participant_emails", []) if isinstance(data, dict) else []
+        return sorted({normalize_email(e) for e in emails if is_valid_email(str(e))})
+    except Exception as exc:
+        print(f"⚠️ Could not load access store: {exc}")
+        return []
+
+def save_managed_participant_emails(emails):
+    directory = os.path.dirname(ACCESS_STORE_PATH)
+    if directory:
+        os.makedirs(directory, exist_ok=True)
+    tmp = f"{ACCESS_STORE_PATH}.tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump({"participant_emails": sorted(set(emails))}, f, indent=2)
+    os.replace(tmp, ACCESS_STORE_PATH)
+
+MANAGED_PARTICIPANT_EMAILS = load_managed_participant_emails()
+
+def current_allowed_emails():
+    return sorted(set(ALLOWED_EMAILS) | set(MANAGED_PARTICIPANT_EMAILS))
+
+def participant_only_emails():
+    return sorted(set(current_allowed_emails()) - set(ADMIN_EMAILS))
+
+
 JWT_SECRET = os.environ.get(
+
+
+
+
+
+
+
+
 
 
 
@@ -514,7 +1064,23 @@ JWT_SECRET = os.environ.get(
 
 
 
+
+
+
+
+
+
+
+
     "change-this-secret-in-production"
+
+
+
+
+
+
+
+
 
 
 
@@ -538,7 +1104,39 @@ JWT_SECRET = os.environ.get(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -578,7 +1176,39 @@ TOKEN_EXPIRY_HOURS = 24
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # ---------------------------------------------------------------------------
+
+
+
+
+
+
+
+
 
 
 
@@ -594,7 +1224,31 @@ TOKEN_EXPIRY_HOURS = 24
 
 
 
+
+
+
+
+
+
+
+
 # ---------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -618,7 +1272,23 @@ def create_access_token(email: str, role: str = "user") -> str:
 
 
 
+
+
+
+
+
+
+
+
     payload = {
+
+
+
+
+
+
+
+
 
 
 
@@ -634,7 +1304,23 @@ def create_access_token(email: str, role: str = "user") -> str:
 
 
 
+
+
+
+
+
+
+
+
         "role": role,
+
+
+
+
+
+
+
+
 
 
 
@@ -650,7 +1336,23 @@ def create_access_token(email: str, role: str = "user") -> str:
 
 
 
+
+
+
+
+
+
+
+
         + datetime.timedelta(hours=TOKEN_EXPIRY_HOURS),
+
+
+
+
+
+
+
+
 
 
 
@@ -674,7 +1376,31 @@ def create_access_token(email: str, role: str = "user") -> str:
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     return jwt.encode(
+
+
+
+
+
+
+
+
 
 
 
@@ -690,7 +1416,23 @@ def create_access_token(email: str, role: str = "user") -> str:
 
 
 
+
+
+
+
+
+
+
+
         JWT_SECRET,
+
+
+
+
+
+
+
+
 
 
 
@@ -706,7 +1448,39 @@ def create_access_token(email: str, role: str = "user") -> str:
 
 
 
+
+
+
+
+
+
+
+
     )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -738,7 +1512,23 @@ def get_token_payload(
 
 
 
+
+
+
+
+
+
+
+
     authorization: Optional[str] = Header(None)
+
+
+
+
+
+
+
+
 
 
 
@@ -762,7 +1552,31 @@ def get_token_payload(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     if not authorization or not authorization.startswith("Bearer "):
+
+
+
+
+
+
+
+
 
 
 
@@ -778,7 +1592,23 @@ def get_token_payload(
 
 
 
+
+
+
+
+
+
+
+
             status_code=401,
+
+
+
+
+
+
+
+
 
 
 
@@ -794,7 +1624,31 @@ def get_token_payload(
 
 
 
+
+
+
+
+
+
+
+
         )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -826,7 +1680,31 @@ def get_token_payload(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     try:
+
+
+
+
+
+
+
+
 
 
 
@@ -842,7 +1720,23 @@ def get_token_payload(
 
 
 
+
+
+
+
+
+
+
+
             token,
+
+
+
+
+
+
+
+
 
 
 
@@ -858,6 +1752,14 @@ def get_token_payload(
 
 
 
+
+
+
+
+
+
+
+
             algorithms=["HS256"]
 
 
@@ -866,7 +1768,31 @@ def get_token_payload(
 
 
 
+
+
+
+
+
+
+
+
         )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -898,7 +1824,31 @@ def get_token_payload(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     except jwt.ExpiredSignatureError:
+
+
+
+
+
+
+
+
 
 
 
@@ -914,7 +1864,23 @@ def get_token_payload(
 
 
 
+
+
+
+
+
+
+
+
             status_code=401,
+
+
+
+
+
+
+
+
 
 
 
@@ -930,7 +1896,31 @@ def get_token_payload(
 
 
 
+
+
+
+
+
+
+
+
         )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -954,7 +1944,23 @@ def get_token_payload(
 
 
 
+
+
+
+
+
+
+
+
         raise HTTPException(
+
+
+
+
+
+
+
+
 
 
 
@@ -970,7 +1976,23 @@ def get_token_payload(
 
 
 
+
+
+
+
+
+
+
+
             detail="Invalid token"
+
+
+
+
+
+
+
+
 
 
 
@@ -1002,7 +2024,39 @@ def get_token_payload(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # ---------------------------------------------------------------------------
+
+
+
+
+
+
+
+
 
 
 
@@ -1018,7 +2072,31 @@ def get_token_payload(
 
 
 
+
+
+
+
+
+
+
+
 # ---------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1042,6 +2120,14 @@ def get_current_user(
 
 
 
+
+
+
+
+
+
+
+
     authorization: Optional[str] = Header(None)
 
 
@@ -1050,7 +2136,31 @@ def get_current_user(
 
 
 
+
+
+
+
+
+
+
+
 ) -> str:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1082,7 +2192,31 @@ def get_current_user(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     email = (payload.get("email") or "").lower()
+
+
+
+
+
+
+
+
 
 
 
@@ -1106,7 +2240,31 @@ def get_current_user(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     if not email:
+
+
+
+
+
+
+
+
 
 
 
@@ -1122,7 +2280,23 @@ def get_current_user(
 
 
 
+
+
+
+
+
+
+
+
             status_code=401,
+
+
+
+
+
+
+
+
 
 
 
@@ -1138,7 +2312,31 @@ def get_current_user(
 
 
 
+
+
+
+
+
+
+
+
         )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1162,7 +2360,23 @@ def get_current_user(
 
 
 
+
+
+
+
+
+
+
+
         raise HTTPException(
+
+
+
+
+
+
+
+
 
 
 
@@ -1178,7 +2392,23 @@ def get_current_user(
 
 
 
+
+
+
+
+
+
+
+
             detail="Not authorized"
+
+
+
+
+
+
+
+
 
 
 
@@ -1202,7 +2432,31 @@ def get_current_user(
 
 
 
-    if email not in ALLOWED_EMAILS:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    if email not in current_allowed_emails():
+
+
+
+
+
+
+
+
 
 
 
@@ -1218,7 +2472,23 @@ def get_current_user(
 
 
 
+
+
+
+
+
+
+
+
             status_code=401,
+
+
+
+
+
+
+
+
 
 
 
@@ -1234,7 +2504,31 @@ def get_current_user(
 
 
 
+
+
+
+
+
+
+
+
         )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1274,7 +2568,39 @@ def get_current_user(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # ---------------------------------------------------------------------------
+
+
+
+
+
+
+
+
 
 
 
@@ -1290,7 +2616,31 @@ def get_current_user(
 
 
 
+
+
+
+
+
+
+
+
 # ---------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1314,6 +2664,14 @@ def get_current_admin(
 
 
 
+
+
+
+
+
+
+
+
     authorization: Optional[str] = Header(None)
 
 
@@ -1322,7 +2680,31 @@ def get_current_admin(
 
 
 
+
+
+
+
+
+
+
+
 ) -> str:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1354,7 +2736,31 @@ def get_current_admin(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     email = (payload.get("email") or "").lower()
+
+
+
+
+
+
+
+
 
 
 
@@ -1378,7 +2784,31 @@ def get_current_admin(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     if not email:
+
+
+
+
+
+
+
+
 
 
 
@@ -1394,7 +2824,23 @@ def get_current_admin(
 
 
 
+
+
+
+
+
+
+
+
             status_code=403,
+
+
+
+
+
+
+
+
 
 
 
@@ -1410,7 +2856,31 @@ def get_current_admin(
 
 
 
+
+
+
+
+
+
+
+
         )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1434,7 +2904,23 @@ def get_current_admin(
 
 
 
+
+
+
+
+
+
+
+
         raise HTTPException(
+
+
+
+
+
+
+
+
 
 
 
@@ -1450,6 +2936,14 @@ def get_current_admin(
 
 
 
+
+
+
+
+
+
+
+
             detail="Admin access required"
 
 
@@ -1458,7 +2952,31 @@ def get_current_admin(
 
 
 
+
+
+
+
+
+
+
+
         )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1482,7 +3000,23 @@ def get_current_admin(
 
 
 
+
+
+
+
+
+
+
+
         raise HTTPException(
+
+
+
+
+
+
+
+
 
 
 
@@ -1498,6 +3032,14 @@ def get_current_admin(
 
 
 
+
+
+
+
+
+
+
+
             detail="Admin access required"
 
 
@@ -1506,7 +3048,31 @@ def get_current_admin(
 
 
 
+
+
+
+
+
+
+
+
         )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1546,7 +3112,39 @@ def get_current_admin(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # ---------------------------------------------------------------------------
+
+
+
+
+
+
+
+
 
 
 
@@ -1562,7 +3160,31 @@ def get_current_admin(
 
 
 
+
+
+
+
+
+
+
+
 # ---------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1586,7 +3208,39 @@ class LoginBody(BaseModel):
 
 
 
+
+
+
+
+
+
+
+
     email: str
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1618,6 +3272,14 @@ class AdminLoginBody(BaseModel):
 
 
 
+
+
+
+
+
+
+
+
     email: str
 
 
@@ -1626,7 +3288,42 @@ class AdminLoginBody(BaseModel):
 
 
 
+
+
+
+
+
+
+
+
     password: str
+
+class ParticipantAccessBody(BaseModel):
+    email: str
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1651,6 +3348,14 @@ class AdminLoginBody(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+
+
+
+
+
+
+
+
 
 
 
@@ -1666,7 +3371,31 @@ class AdminLoginBody(BaseModel):
 
 
 
+
+
+
+
+
+
+
+
 # ---------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1690,6 +3419,14 @@ class AdminLoginBody(BaseModel):
 
 
 
+
+
+
+
+
+
+
+
 def login(body: LoginBody):
 
 
@@ -1706,7 +3443,39 @@ def login(body: LoginBody):
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     email = body.email.strip().lower()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1730,7 +3499,23 @@ def login(body: LoginBody):
 
 
 
+
+
+
+
+
+
+
+
         raise HTTPException(
+
+
+
+
+
+
+
+
 
 
 
@@ -1746,7 +3531,23 @@ def login(body: LoginBody):
 
 
 
+
+
+
+
+
+
+
+
             detail="Email is required"
+
+
+
+
+
+
+
+
 
 
 
@@ -1770,7 +3571,31 @@ def login(body: LoginBody):
 
 
 
-    if email not in ALLOWED_EMAILS:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    if email not in current_allowed_emails():
+
+
+
+
+
+
+
+
 
 
 
@@ -1786,7 +3611,23 @@ def login(body: LoginBody):
 
 
 
+
+
+
+
+
+
+
+
             status_code=403,
+
+
+
+
+
+
+
+
 
 
 
@@ -1802,7 +3643,31 @@ def login(body: LoginBody):
 
 
 
+
+
+
+
+
+
+
+
         )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1826,7 +3691,23 @@ def login(body: LoginBody):
 
 
 
+
+
+
+
+
+
+
+
     if email in ADMIN_EMAILS:
+
+
+
+
+
+
+
+
 
 
 
@@ -1842,6 +3723,14 @@ def login(body: LoginBody):
 
 
 
+
+
+
+
+
+
+
+
             "status": "password_required",
 
 
@@ -1850,7 +3739,23 @@ def login(body: LoginBody):
 
 
 
+
+
+
+
+
+
+
+
             "requires_password": True
+
+
+
+
+
+
+
+
 
 
 
@@ -1874,7 +3779,31 @@ def login(body: LoginBody):
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     token = create_access_token(
+
+
+
+
+
+
+
+
 
 
 
@@ -1890,7 +3819,23 @@ def login(body: LoginBody):
 
 
 
+
+
+
+
+
+
+
+
         role="user"
+
+
+
+
+
+
+
+
 
 
 
@@ -1902,7 +3847,27 @@ def login(body: LoginBody):
 
 
 
+
+
+
+
     create_participant_session(email)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1926,7 +3891,23 @@ def login(body: LoginBody):
 
 
 
+
+
+
+
+
+
+
+
         "status": "success",
+
+
+
+
+
+
+
+
 
 
 
@@ -1942,6 +3923,14 @@ def login(body: LoginBody):
 
 
 
+
+
+
+
+
+
+
+
         "token": token,
 
 
@@ -1950,7 +3939,23 @@ def login(body: LoginBody):
 
 
 
+
+
+
+
+
+
+
+
         "role": "user"
+
+
+
+
+
+
+
+
 
 
 
@@ -1982,7 +3987,39 @@ def login(body: LoginBody):
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # ---------------------------------------------------------------------------
+
+
+
+
+
+
+
+
 
 
 
@@ -1998,7 +4035,31 @@ def login(body: LoginBody):
 
 
 
+
+
+
+
+
+
+
+
 # ---------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2022,7 +4083,31 @@ def login(body: LoginBody):
 
 
 
+
+
+
+
+
+
+
+
 def admin_login(body: AdminLoginBody):
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2054,7 +4139,31 @@ def admin_login(body: AdminLoginBody):
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     if email not in ADMIN_EMAILS:
+
+
+
+
+
+
+
+
 
 
 
@@ -2070,7 +4179,23 @@ def admin_login(body: AdminLoginBody):
 
 
 
+
+
+
+
+
+
+
+
             status_code=403,
+
+
+
+
+
+
+
+
 
 
 
@@ -2086,7 +4211,31 @@ def admin_login(body: AdminLoginBody):
 
 
 
+
+
+
+
+
+
+
+
         )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2110,7 +4259,23 @@ def admin_login(body: AdminLoginBody):
 
 
 
+
+
+
+
+
+
+
+
         raise HTTPException(
+
+
+
+
+
+
+
+
 
 
 
@@ -2126,6 +4291,14 @@ def admin_login(body: AdminLoginBody):
 
 
 
+
+
+
+
+
+
+
+
             detail="Admin authentication is not configured"
 
 
@@ -2134,7 +4307,31 @@ def admin_login(body: AdminLoginBody):
 
 
 
+
+
+
+
+
+
+
+
         )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2158,7 +4355,23 @@ def admin_login(body: AdminLoginBody):
 
 
 
+
+
+
+
+
+
+
+
     if not hmac.compare_digest(
+
+
+
+
+
+
+
+
 
 
 
@@ -2174,7 +4387,23 @@ def admin_login(body: AdminLoginBody):
 
 
 
+
+
+
+
+
+
+
+
         ADMIN_PASSWORD
+
+
+
+
+
+
+
+
 
 
 
@@ -2190,7 +4419,23 @@ def admin_login(body: AdminLoginBody):
 
 
 
+
+
+
+
+
+
+
+
         raise HTTPException(
+
+
+
+
+
+
+
+
 
 
 
@@ -2206,7 +4451,23 @@ def admin_login(body: AdminLoginBody):
 
 
 
+
+
+
+
+
+
+
+
             detail="Incorrect password"
+
+
+
+
+
+
+
+
 
 
 
@@ -2230,7 +4491,31 @@ def admin_login(body: AdminLoginBody):
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     token = create_access_token(
+
+
+
+
+
+
+
+
 
 
 
@@ -2246,7 +4531,23 @@ def admin_login(body: AdminLoginBody):
 
 
 
+
+
+
+
+
+
+
+
         role="admin"
+
+
+
+
+
+
+
+
 
 
 
@@ -2270,7 +4571,31 @@ def admin_login(body: AdminLoginBody):
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     return {
+
+
+
+
+
+
+
+
 
 
 
@@ -2286,6 +4611,14 @@ def admin_login(body: AdminLoginBody):
 
 
 
+
+
+
+
+
+
+
+
         "token": token,
 
 
@@ -2294,7 +4627,23 @@ def admin_login(body: AdminLoginBody):
 
 
 
+
+
+
+
+
+
+
+
         "role": "admin"
+
+
+
+
+
+
+
+
 
 
 
@@ -2326,7 +4675,91 @@ def admin_login(body: AdminLoginBody):
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # ---------------------------------------------------------------------------
+# ADMIN ACCESS MANAGEMENT
+# ---------------------------------------------------------------------------
+
+@app.get("/admin/access")
+def admin_access(current_admin: str = Depends(get_current_admin)):
+    return {"participant_emails": participant_only_emails(), "admin_emails": sorted(set(ADMIN_EMAILS))}
+
+@app.post("/admin/access/participants")
+def add_participant_access(body: ParticipantAccessBody, current_admin: str = Depends(get_current_admin)):
+    email = normalize_email(body.email)
+    if not is_valid_email(email):
+        raise HTTPException(status_code=400, detail="Enter a valid email address")
+    if email in ADMIN_EMAILS:
+        raise HTTPException(status_code=409, detail="This email is already an admin")
+    if email in current_allowed_emails():
+        return {"status": "success", "message": "Email is already allowed", "email": email,
+                "participant_emails": participant_only_emails()}
+    with access_store_lock:
+        MANAGED_PARTICIPANT_EMAILS.append(email)
+        MANAGED_PARTICIPANT_EMAILS.sort()
+        try:
+            save_managed_participant_emails(MANAGED_PARTICIPANT_EMAILS)
+        except Exception as exc:
+            MANAGED_PARTICIPANT_EMAILS.remove(email)
+            raise HTTPException(status_code=503, detail=f"Could not persist access change: {exc}")
+    return {"status": "success", "message": "Participant email added", "email": email,
+            "participant_emails": participant_only_emails()}
+
+@app.delete("/admin/access/participants")
+def remove_participant_access(body: ParticipantAccessBody, current_admin: str = Depends(get_current_admin)):
+    email = normalize_email(body.email)
+    if not is_valid_email(email):
+        raise HTTPException(status_code=400, detail="Enter a valid email address")
+    if email in ADMIN_EMAILS:
+        raise HTTPException(status_code=403, detail="Admin emails cannot be removed here")
+    if email in ALLOWED_EMAILS:
+        raise HTTPException(status_code=409, detail="This email is configured in Railway ALLOWED_EMAILS and must be removed there")
+    with access_store_lock:
+        if email not in MANAGED_PARTICIPANT_EMAILS:
+            raise HTTPException(status_code=404, detail="Participant email not found")
+        MANAGED_PARTICIPANT_EMAILS.remove(email)
+        try:
+            save_managed_participant_emails(MANAGED_PARTICIPANT_EMAILS)
+        except Exception as exc:
+            MANAGED_PARTICIPANT_EMAILS.append(email)
+            MANAGED_PARTICIPANT_EMAILS.sort()
+            raise HTTPException(status_code=503, detail=f"Could not persist access change: {exc}")
+    return {"status": "success", "message": "Participant email removed", "email": email,
+            "participant_emails": participant_only_emails()}
+
+
+# ---------------------------------------------------------------------------
+
+
+
+
+
+
+
+
 
 
 
@@ -2342,7 +4775,31 @@ def admin_login(body: AdminLoginBody):
 
 
 
+
+
+
+
+
+
+
+
 # ---------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2366,7 +4823,23 @@ SHEET_HEADERS = [
 
 
 
+
+
+
+
+
+
+
+
     "Session ID",
+
+
+
+
+
+
+
+
 
 
 
@@ -2382,7 +4855,23 @@ SHEET_HEADERS = [
 
 
 
+
+
+
+
+
+
+
+
     "Participant ID (Prolific)",
+
+
+
+
+
+
+
+
 
 
 
@@ -2398,7 +4887,23 @@ SHEET_HEADERS = [
 
 
 
+
+
+
+
+
+
+
+
     "Message Index",
+
+
+
+
+
+
+
+
 
 
 
@@ -2414,7 +4919,23 @@ SHEET_HEADERS = [
 
 
 
+
+
+
+
+
+
+
+
     "Gender",
+
+
+
+
+
+
+
+
 
 
 
@@ -2430,7 +4951,23 @@ SHEET_HEADERS = [
 
 
 
+
+
+
+
+
+
+
+
     "Family History",
+
+
+
+
+
+
+
+
 
 
 
@@ -2446,7 +4983,23 @@ SHEET_HEADERS = [
 
 
 
+
+
+
+
+
+
+
+
     "Smoking",
+
+
+
+
+
+
+
+
 
 
 
@@ -2462,7 +5015,23 @@ SHEET_HEADERS = [
 
 
 
+
+
+
+
+
+
+
+
     "Community",
+
+
+
+
+
+
+
+
 
 
 
@@ -2478,7 +5047,23 @@ SHEET_HEADERS = [
 
 
 
+
+
+
+
+
+
+
+
     "Answer",
+
+
+
+
+
+
+
+
 
 
 
@@ -2510,7 +5095,39 @@ SHEET_HEADERS = [
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # Tracks message count per session during the current server runtime.
+
+
+
+
+
+
+
+
 
 
 
@@ -2546,15 +5163,53 @@ session_message_counts = {}
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # Participant login/session tracking is intentionally kept OUT of Google Sheets.
+
+
 
 # It exists only in the running API process and is exposed through /admin/sessions.
 
+
+
 # A Railway restart/redeploy starts a fresh session list.
+
+
 
 participant_sessions = {}
 
+
+
 participant_sessions_lock = threading.Lock()
+
+
 
 ACTIVE_SESSION_WINDOW_SECONDS = 15 * 60
 
@@ -2562,7 +5217,15 @@ ACTIVE_SESSION_WINDOW_SECONDS = 15 * 60
 
 
 
+
+
+
+
+
+
 def utc_now_iso():
+
+
 
     return datetime.datetime.now(datetime.timezone.utc).isoformat()
 
@@ -2570,19 +5233,43 @@ def utc_now_iso():
 
 
 
+
+
+
+
+
+
 def parse_iso_datetime(value):
+
+
 
     if not value:
 
+
+
         return None
+
+
 
     try:
 
+
+
         return datetime.datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+
+
 
     except (TypeError, ValueError):
 
+
+
         return None
+
+
+
+
+
+
 
 
 
@@ -2590,27 +5277,51 @@ def parse_iso_datetime(value):
 
 def create_participant_session(email: str):
 
+
+
     """Create an in-memory participant login session and return its ID."""
+
+
 
     normalized_email = (email or "").strip().lower()
 
+
+
     if not normalized_email or normalized_email in ADMIN_EMAILS:
+
+
 
         return None
 
+
+
     session_id = str(uuid.uuid4())
+
+
 
     now = utc_now_iso()
 
+
+
     with participant_sessions_lock:
+
+
 
         participant_sessions[session_id] = {
 
+
+
             "email": normalized_email, "session_id": session_id,
+
+
 
             "login_time": now, "last_activity": now, "message_count": 0,
 
+
+
         }
+
+
 
     return session_id
 
@@ -2618,35 +5329,71 @@ def create_participant_session(email: str):
 
 
 
+
+
+
+
+
+
 def update_participant_session(email: str):
+
+
 
     """Update the participant's most recent login session after a chat message."""
 
+
+
     normalized_email = (email or "").strip().lower()
+
+
 
     if not normalized_email or normalized_email in ADMIN_EMAILS:
 
+
+
         return
+
+
 
     now = utc_now_iso()
 
+
+
     with participant_sessions_lock:
+
+
 
         matching = [x for x in participant_sessions.values() if x.get("email") == normalized_email]
 
+
+
         if matching:
+
+
 
             session = max(matching, key=lambda x: x.get("login_time", ""))
 
+
+
         else:
+
+
 
             session_id = str(uuid.uuid4())
 
+
+
             session = {"email": normalized_email, "session_id": session_id, "login_time": now, "last_activity": now, "message_count": 0}
+
+
 
             participant_sessions[session_id] = session
 
+
+
         session["last_activity"] = now
+
+
 
         session["message_count"] = int(session.get("message_count", 0) or 0) + 1
 
@@ -2654,53 +5401,121 @@ def update_participant_session(email: str):
 
 
 
+
+
+
+
+
+
 def end_participant_session(email: str):
+
     """Mark the participant's most recent in-memory session as explicitly ended."""
+
     normalized_email = (email or "").strip().lower()
+
     if not normalized_email or normalized_email in ADMIN_EMAILS:
+
         return
+
     now = utc_now_iso()
+
     with participant_sessions_lock:
+
         matching = [x for x in participant_sessions.values() if x.get("email") == normalized_email]
+
         if not matching:
+
             return
+
         session = max(matching, key=lambda x: x.get("login_time", ""))
+
         session["last_activity"] = now
+
         session["ended_at"] = now
+
 @app.post("/auth/logout")
+
 def logout(payload: dict = Depends(get_token_payload)):
+
     """Log out the current user and end a participant session."""
+
     email = (payload.get("email") or "").strip().lower()
+
     role = payload.get("role")
 
+
+
     if role == "user":
-        if email not in ALLOWED_EMAILS:
+
+        if email not in current_allowed_emails():
+
             raise HTTPException(
+
                 status_code=401,
+
                 detail="Not authorized"
+
             )
+
+
 
         end_participant_session(email)
 
+
+
     elif role == "admin":
+
         if email not in ADMIN_EMAILS:
+
             raise HTTPException(
+
                 status_code=403,
+
                 detail="Admin access required"
+
             )
 
+
+
     else:
+
         raise HTTPException(
+
             status_code=401,
+
             detail="Not authorized"
+
         )
 
+
+
     return {
+
         "status": "success",
+
         "message": "Logged out"
+
     }
 
+
+
 def init_google_sheets():
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2732,7 +5547,39 @@ def init_google_sheets():
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     try:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2756,7 +5603,23 @@ def init_google_sheets():
 
 
 
+
+
+
+
+
+
+
+
             "GOOGLE_CREDENTIALS_JSON"
+
+
+
+
+
+
+
+
 
 
 
@@ -2780,7 +5643,31 @@ def init_google_sheets():
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         if not creds_json:
+
+
+
+
+
+
+
+
 
 
 
@@ -2796,7 +5683,23 @@ def init_google_sheets():
 
 
 
+
+
+
+
+
+
+
+
                 "⚠️ GOOGLE_CREDENTIALS_JSON not set, "
+
+
+
+
+
+
+
+
 
 
 
@@ -2812,6 +5715,14 @@ def init_google_sheets():
 
 
 
+
+
+
+
+
+
+
+
             )
 
 
@@ -2820,7 +5731,31 @@ def init_google_sheets():
 
 
 
+
+
+
+
+
+
+
+
             return
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2852,7 +5787,31 @@ def init_google_sheets():
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         scopes = [
+
+
+
+
+
+
+
+
 
 
 
@@ -2868,7 +5827,23 @@ def init_google_sheets():
 
 
 
+
+
+
+
+
+
+
+
             "https://www.googleapis.com/auth/drive"
+
+
+
+
+
+
+
+
 
 
 
@@ -2892,7 +5867,31 @@ def init_google_sheets():
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         creds = Credentials.from_service_account_info(
+
+
+
+
+
+
+
+
 
 
 
@@ -2908,6 +5907,14 @@ def init_google_sheets():
 
 
 
+
+
+
+
+
+
+
+
             scopes=scopes
 
 
@@ -2916,7 +5923,31 @@ def init_google_sheets():
 
 
 
+
+
+
+
+
+
+
+
         )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2948,7 +5979,31 @@ def init_google_sheets():
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         spreadsheet = client.open_by_key(
+
+
+
+
+
+
+
+
 
 
 
@@ -2964,7 +6019,31 @@ def init_google_sheets():
 
 
 
+
+
+
+
+
+
+
+
         )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2996,7 +6075,39 @@ def init_google_sheets():
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         existing_header = sheet.row_values(1)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3028,7 +6139,31 @@ def init_google_sheets():
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
             # Only update the header row.
+
+
+
+
+
+
+
+
 
 
 
@@ -3044,7 +6179,23 @@ def init_google_sheets():
 
 
 
+
+
+
+
+
+
+
+
             sheet.update(
+
+
+
+
+
+
+
+
 
 
 
@@ -3060,7 +6211,23 @@ def init_google_sheets():
 
 
 
+
+
+
+
+
+
+
+
                 [SHEET_HEADERS]
+
+
+
+
+
+
+
+
 
 
 
@@ -3084,7 +6251,31 @@ def init_google_sheets():
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         print(
+
+
+
+
+
+
+
+
 
 
 
@@ -3100,7 +6291,31 @@ def init_google_sheets():
 
 
 
+
+
+
+
+
+
+
+
         )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3132,6 +6347,22 @@ def init_google_sheets():
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         import traceback
 
 
@@ -3148,7 +6379,31 @@ def init_google_sheets():
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         print(
+
+
+
+
+
+
+
+
 
 
 
@@ -3164,7 +6419,31 @@ def init_google_sheets():
 
 
 
+
+
+
+
+
+
+
+
         )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3188,6 +6467,14 @@ def init_google_sheets():
 
 
 
+
+
+
+
+
+
+
+
             traceback.format_exc()
 
 
@@ -3196,7 +6483,31 @@ def init_google_sheets():
 
 
 
+
+
+
+
+
+
+
+
         )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3236,7 +6547,39 @@ def init_google_sheets():
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 def log_to_sheets(
+
+
+
+
+
+
+
+
 
 
 
@@ -3252,7 +6595,23 @@ def log_to_sheets(
 
 
 
+
+
+
+
+
+
+
+
     reply,
+
+
+
+
+
+
+
+
 
 
 
@@ -3268,7 +6627,31 @@ def log_to_sheets(
 
 
 
+
+
+
+
+
+
+
+
 ):
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3300,6 +6683,22 @@ def log_to_sheets(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     if not sheet:
 
 
@@ -3308,7 +6707,31 @@ def log_to_sheets(
 
 
 
+
+
+
+
+
+
+
+
         return
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3340,7 +6763,31 @@ def log_to_sheets(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         session_id = (
+
+
+
+
+
+
+
+
 
 
 
@@ -3356,7 +6803,31 @@ def log_to_sheets(
 
 
 
+
+
+
+
+
+
+
+
         )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3380,7 +6851,23 @@ def log_to_sheets(
 
 
 
+
+
+
+
+
+
+
+
             session_message_counts.get(
+
+
+
+
+
+
+
+
 
 
 
@@ -3396,7 +6883,23 @@ def log_to_sheets(
 
 
 
+
+
+
+
+
+
+
+
                 0
+
+
+
+
+
+
+
+
 
 
 
@@ -3412,7 +6915,31 @@ def log_to_sheets(
 
 
 
+
+
+
+
+
+
+
+
         )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3436,7 +6963,23 @@ def log_to_sheets(
 
 
 
+
+
+
+
+
+
+
+
             session_message_counts[
+
+
+
+
+
+
+
+
 
 
 
@@ -3452,6 +6995,14 @@ def log_to_sheets(
 
 
 
+
+
+
+
+
+
+
+
             ]
 
 
@@ -3460,7 +7011,31 @@ def log_to_sheets(
 
 
 
+
+
+
+
+
+
+
+
         )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3484,7 +7059,23 @@ def log_to_sheets(
 
 
 
+
+
+
+
+
+
+
+
             session_id,
+
+
+
+
+
+
+
+
 
 
 
@@ -3500,7 +7091,23 @@ def log_to_sheets(
 
 
 
+
+
+
+
+
+
+
+
             request.participant_id or "",
+
+
+
+
+
+
+
+
 
 
 
@@ -3516,7 +7123,23 @@ def log_to_sheets(
 
 
 
+
+
+
+
+
+
+
+
                 "%Y-%m-%d %H:%M:%S"
+
+
+
+
+
+
+
+
 
 
 
@@ -3532,7 +7155,23 @@ def log_to_sheets(
 
 
 
+
+
+
+
+
+
+
+
             message_index,
+
+
+
+
+
+
+
+
 
 
 
@@ -3548,7 +7187,23 @@ def log_to_sheets(
 
 
 
+
+
+
+
+
+
+
+
             request.gender or "",
+
+
+
+
+
+
+
+
 
 
 
@@ -3564,7 +7219,23 @@ def log_to_sheets(
 
 
 
+
+
+
+
+
+
+
+
             request.family_history or "",
+
+
+
+
+
+
+
+
 
 
 
@@ -3580,7 +7251,23 @@ def log_to_sheets(
 
 
 
+
+
+
+
+
+
+
+
             request.smoking or "",
+
+
+
+
+
+
+
+
 
 
 
@@ -3596,7 +7283,23 @@ def log_to_sheets(
 
 
 
+
+
+
+
+
+
+
+
             request.community or "",
+
+
+
+
+
+
+
+
 
 
 
@@ -3612,7 +7315,23 @@ def log_to_sheets(
 
 
 
+
+
+
+
+
+
+
+
             reply,
+
+
+
+
+
+
+
+
 
 
 
@@ -3636,7 +7355,31 @@ def log_to_sheets(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         sheet.append_row(
+
+
+
+
+
+
+
+
 
 
 
@@ -3652,7 +7395,31 @@ def log_to_sheets(
 
 
 
+
+
+
+
+
+
+
+
         )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3684,6 +7451,22 @@ def log_to_sheets(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         print(
 
 
@@ -3692,7 +7475,23 @@ def log_to_sheets(
 
 
 
+
+
+
+
+
+
+
+
             f"⚠️ Failed to log to Sheets: {e}"
+
+
+
+
+
+
+
+
 
 
 
@@ -3724,7 +7523,39 @@ def log_to_sheets(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # ---------------------------------------------------------------------------
+
+
+
+
+
+
+
+
 
 
 
@@ -3740,7 +7571,31 @@ def log_to_sheets(
 
 
 
+
+
+
+
+
+
+
+
 # ---------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3764,7 +7619,31 @@ def log_to_sheets(
 
 
 
+
+
+
+
+
+
+
+
 async def startup_event():
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3796,7 +7675,31 @@ async def startup_event():
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     api_key = os.environ.get(
+
+
+
+
+
+
+
+
 
 
 
@@ -3812,7 +7715,31 @@ async def startup_event():
 
 
 
+
+
+
+
+
+
+
+
     )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3836,7 +7763,23 @@ async def startup_event():
 
 
 
+
+
+
+
+
+
+
+
         model="gpt-4o",
+
+
+
+
+
+
+
+
 
 
 
@@ -3852,6 +7795,14 @@ async def startup_event():
 
 
 
+
+
+
+
+
+
+
+
         temperature=0.4
 
 
@@ -3860,7 +7811,31 @@ async def startup_event():
 
 
 
+
+
+
+
+
+
+
+
     )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3892,7 +7867,31 @@ async def startup_event():
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         embeddings = OpenAIEmbeddings(
+
+
+
+
+
+
+
+
 
 
 
@@ -3908,6 +7907,14 @@ async def startup_event():
 
 
 
+
+
+
+
+
+
+
+
             openai_api_key=api_key
 
 
@@ -3916,7 +7923,31 @@ async def startup_event():
 
 
 
+
+
+
+
+
+
+
+
         )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3940,7 +7971,23 @@ async def startup_event():
 
 
 
+
+
+
+
+
+
+
+
             persist_directory="./knowledge_base",
+
+
+
+
+
+
+
+
 
 
 
@@ -3956,7 +8003,31 @@ async def startup_event():
 
 
 
+
+
+
+
+
+
+
+
         )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3980,6 +8051,14 @@ async def startup_event():
 
 
 
+
+
+
+
+
+
+
+
             "✅ Models and knowledge base loaded successfully!"
 
 
@@ -3988,7 +8067,31 @@ async def startup_event():
 
 
 
+
+
+
+
+
+
+
+
         )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -4020,7 +8123,31 @@ async def startup_event():
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         print(
+
+
+
+
+
+
+
+
 
 
 
@@ -4036,7 +8163,23 @@ async def startup_event():
 
 
 
+
+
+
+
+
+
+
+
             f"will answer without context: {e}"
+
+
+
+
+
+
+
+
 
 
 
@@ -4060,7 +8203,39 @@ async def startup_event():
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         vectorstore = None
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -4100,7 +8275,39 @@ async def startup_event():
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # ---------------------------------------------------------------------------
+
+
+
+
+
+
+
+
 
 
 
@@ -4116,7 +8323,31 @@ async def startup_event():
 
 
 
+
+
+
+
+
+
+
+
 # ---------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -4148,7 +8379,39 @@ class ChatRequest(BaseModel):
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     message: str
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -4180,7 +8443,39 @@ class ChatRequest(BaseModel):
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     participant_id: Optional[str] = None
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -4212,7 +8507,39 @@ class ChatRequest(BaseModel):
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     gender: Optional[str] = None
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -4244,7 +8571,39 @@ class ChatRequest(BaseModel):
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     family_history: Optional[str] = None
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -4276,7 +8635,39 @@ class ChatRequest(BaseModel):
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     smoking: Optional[str] = None
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -4308,6 +8699,22 @@ class ChatRequest(BaseModel):
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     activity: Optional[str] = None
 
 
@@ -4324,7 +8731,39 @@ class ChatRequest(BaseModel):
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     community: Optional[str] = None
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -4364,6 +8803,30 @@ class ChatRequest(BaseModel):
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 class ChatResponse(BaseModel):
 
 
@@ -4380,7 +8843,39 @@ class ChatResponse(BaseModel):
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     reply: str
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -4420,7 +8915,39 @@ class ChatResponse(BaseModel):
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # ---------------------------------------------------------------------------
+
+
+
+
+
+
+
+
 
 
 
@@ -4436,7 +8963,31 @@ class ChatResponse(BaseModel):
 
 
 
+
+
+
+
+
+
+
+
 # ---------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -4460,7 +9011,31 @@ class ChatResponse(BaseModel):
 
 
 
+
+
+
+
+
+
+
+
 def root():
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -4484,7 +9059,23 @@ def root():
 
 
 
+
+
+
+
+
+
+
+
         "status": "AgentT is online! 🎓",
+
+
+
+
+
+
+
+
 
 
 
@@ -4500,7 +9091,39 @@ def root():
 
 
 
+
+
+
+
+
+
+
+
     }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -4532,7 +9155,31 @@ def root():
 
 
 
+
+
+
+
+
+
+
+
 def health():
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -4556,7 +9203,23 @@ def health():
 
 
 
+
+
+
+
+
+
+
+
         "status": "healthy"
+
+
+
+
+
+
+
+
 
 
 
@@ -4588,7 +9251,39 @@ def health():
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # ---------------------------------------------------------------------------
+
+
+
+
+
+
+
+
 
 
 
@@ -4604,7 +9299,31 @@ def health():
 
 
 
+
+
+
+
+
+
+
+
 # ---------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -4628,7 +9347,23 @@ def health():
 
 
 
+
+
+
+
+
+
+
+
     "/chat",
+
+
+
+
+
+
+
+
 
 
 
@@ -4644,7 +9379,23 @@ def health():
 
 
 
+
+
+
+
+
+
+
+
 )
+
+
+
+
+
+
+
+
 
 
 
@@ -4660,7 +9411,23 @@ async def chat(
 
 
 
+
+
+
+
+
+
+
+
     request: ChatRequest,
+
+
+
+
+
+
+
+
 
 
 
@@ -4676,6 +9443,14 @@ async def chat(
 
 
 
+
+
+
+
+
+
+
+
         get_current_user
 
 
@@ -4684,7 +9459,23 @@ async def chat(
 
 
 
+
+
+
+
+
+
+
+
     )
+
+
+
+
+
+
+
+
 
 
 
@@ -4708,7 +9499,39 @@ async def chat(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     try:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -4740,7 +9563,39 @@ async def chat(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         if vectorstore:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -4764,7 +9619,23 @@ async def chat(
 
 
 
+
+
+
+
+
+
+
+
                 request.message,
+
+
+
+
+
+
+
+
 
 
 
@@ -4780,7 +9651,31 @@ async def chat(
 
 
 
+
+
+
+
+
+
+
+
             )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -4804,6 +9699,14 @@ async def chat(
 
 
 
+
+
+
+
+
+
+
+
                 d.page_content
 
 
@@ -4812,7 +9715,23 @@ async def chat(
 
 
 
+
+
+
+
+
+
+
+
                 for d in docs
+
+
+
+
+
+
+
+
 
 
 
@@ -4836,7 +9755,31 @@ async def chat(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         age = (
+
+
+
+
+
+
+
+
 
 
 
@@ -4852,7 +9795,31 @@ async def chat(
 
 
 
+
+
+
+
+
+
+
+
         )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -4876,6 +9843,14 @@ async def chat(
 
 
 
+
+
+
+
+
+
+
+
             request.gender or "unknown"
 
 
@@ -4884,7 +9859,31 @@ async def chat(
 
 
 
+
+
+
+
+
+
+
+
         )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -4908,6 +9907,14 @@ async def chat(
 
 
 
+
+
+
+
+
+
+
+
             request.ethnicity
 
 
@@ -4916,7 +9923,23 @@ async def chat(
 
 
 
+
+
+
+
+
+
+
+
             or "Chinese American"
+
+
+
+
+
+
+
+
 
 
 
@@ -4940,7 +9963,31 @@ async def chat(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         system_prompt = f"""
+
+
+
+
+
+
+
+
 
 
 
@@ -4956,7 +10003,31 @@ You are AgentT, a warm and knowledgeable cancer screening educator
 
 
 
+
+
+
+
+
+
+
+
 for {ethnicity} and broader Asian communities.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -4988,7 +10059,31 @@ User profile: Age {age}, {gender}, {ethnicity}.
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 Instructions:
+
+
+
+
+
+
+
+
 
 
 
@@ -5004,7 +10099,23 @@ Instructions:
 
 
 
+
+
+
+
+
+
+
+
 - Tailor information to the user's age and gender when relevant
+
+
+
+
+
+
+
+
 
 
 
@@ -5020,6 +10131,14 @@ Instructions:
 
 
 
+
+
+
+
+
+
+
+
 - If answer is not in context say: "I don't have that specific info — please speak with your doctor."
 
 
@@ -5028,7 +10147,23 @@ Instructions:
 
 
 
+
+
+
+
+
+
+
+
 - Do NOT add disclaimers at the end
+
+
+
+
+
+
+
+
 
 
 
@@ -5052,6 +10187,22 @@ Instructions:
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 Context from knowledge base:
 
 
@@ -5060,7 +10211,23 @@ Context from knowledge base:
 
 
 
+
+
+
+
+
+
+
+
 {context}
+
+
+
+
+
+
+
+
 
 
 
@@ -5084,7 +10251,31 @@ Context from knowledge base:
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         messages = [
+
+
+
+
+
+
+
+
 
 
 
@@ -5100,7 +10291,23 @@ Context from knowledge base:
 
 
 
+
+
+
+
+
+
+
+
                 "role": "system",
+
+
+
+
+
+
+
+
 
 
 
@@ -5116,7 +10323,23 @@ Context from knowledge base:
 
 
 
+
+
+
+
+
+
+
+
             }
+
+
+
+
+
+
+
+
 
 
 
@@ -5140,6 +10363,22 @@ Context from knowledge base:
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         for msg in (
 
 
@@ -5148,7 +10387,23 @@ Context from knowledge base:
 
 
 
+
+
+
+
+
+
+
+
             request.conversation_history[-6:]
+
+
+
+
+
+
+
+
 
 
 
@@ -5172,7 +10427,31 @@ Context from knowledge base:
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
             if msg.get("role") in [
+
+
+
+
+
+
+
+
 
 
 
@@ -5188,7 +10467,23 @@ Context from knowledge base:
 
 
 
+
+
+
+
+
+
+
+
                 "assistant"
+
+
+
+
+
+
+
+
 
 
 
@@ -5212,7 +10507,31 @@ Context from knowledge base:
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
                 messages.append(
+
+
+
+
+
+
+
+
 
 
 
@@ -5228,7 +10547,23 @@ Context from knowledge base:
 
 
 
+
+
+
+
+
+
+
+
                         "role": msg["role"],
+
+
+
+
+
+
+
+
 
 
 
@@ -5244,7 +10579,23 @@ Context from knowledge base:
 
 
 
+
+
+
+
+
+
+
+
                     }
+
+
+
+
+
+
+
+
 
 
 
@@ -5268,7 +10619,31 @@ Context from knowledge base:
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         messages.append(
+
+
+
+
+
+
+
+
 
 
 
@@ -5284,7 +10659,23 @@ Context from knowledge base:
 
 
 
+
+
+
+
+
+
+
+
                 "role": "user",
+
+
+
+
+
+
+
+
 
 
 
@@ -5300,6 +10691,14 @@ Context from knowledge base:
 
 
 
+
+
+
+
+
+
+
+
             }
 
 
@@ -5308,7 +10707,31 @@ Context from knowledge base:
 
 
 
+
+
+
+
+
+
+
+
         )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -5332,6 +10755,14 @@ Context from knowledge base:
 
 
 
+
+
+
+
+
+
+
+
             messages
 
 
@@ -5340,7 +10771,31 @@ Context from knowledge base:
 
 
 
+
+
+
+
+
+
+
+
         )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -5364,7 +10819,23 @@ Context from knowledge base:
 
 
 
+
+
+
+
+
+
+
+
             response.content
+
+
+
+
+
+
+
+
 
 
 
@@ -5380,7 +10851,23 @@ Context from knowledge base:
 
 
 
+
+
+
+
+
+
+
+
                 response,
+
+
+
+
+
+
+
+
 
 
 
@@ -5396,7 +10883,23 @@ Context from knowledge base:
 
 
 
+
+
+
+
+
+
+
+
             )
+
+
+
+
+
+
+
+
 
 
 
@@ -5412,7 +10915,31 @@ Context from knowledge base:
 
 
 
+
+
+
+
+
+
+
+
         )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -5436,7 +10963,23 @@ Context from knowledge base:
 
 
 
+
+
+
+
+
+
+
+
         # with every interaction.
+
+
+
+
+
+
+
+
 
 
 
@@ -5452,7 +10995,23 @@ Context from knowledge base:
 
 
 
+
+
+
+
+
+
+
+
             request,
+
+
+
+
+
+
+
+
 
 
 
@@ -5468,7 +11027,23 @@ Context from knowledge base:
 
 
 
+
+
+
+
+
+
+
+
             current_user
+
+
+
+
+
+
+
+
 
 
 
@@ -5480,7 +11055,27 @@ Context from knowledge base:
 
 
 
+
+
+
+
         update_participant_session(current_user)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -5504,7 +11099,23 @@ Context from knowledge base:
 
 
 
+
+
+
+
+
+
+
+
             reply=reply,
+
+
+
+
+
+
+
+
 
 
 
@@ -5520,7 +11131,31 @@ Context from knowledge base:
 
 
 
+
+
+
+
+
+
+
+
         )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -5552,7 +11187,31 @@ Context from knowledge base:
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         print(
+
+
+
+
+
+
+
+
 
 
 
@@ -5568,7 +11227,31 @@ Context from knowledge base:
 
 
 
+
+
+
+
+
+
+
+
         )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -5592,7 +11275,23 @@ Context from knowledge base:
 
 
 
+
+
+
+
+
+
+
+
             reply=(
+
+
+
+
+
+
+
+
 
 
 
@@ -5608,7 +11307,23 @@ Context from knowledge base:
 
 
 
+
+
+
+
+
+
+
+
                 "right now. Please try again "
+
+
+
+
+
+
+
+
 
 
 
@@ -5624,6 +11339,14 @@ Context from knowledge base:
 
 
 
+
+
+
+
+
+
+
+
             ),
 
 
@@ -5632,7 +11355,23 @@ Context from knowledge base:
 
 
 
+
+
+
+
+
+
+
+
             status="error"
+
+
+
+
+
+
+
+
 
 
 
@@ -5664,7 +11403,39 @@ Context from knowledge base:
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # ---------------------------------------------------------------------------
+
+
+
+
+
+
+
+
 
 
 
@@ -5680,7 +11451,31 @@ Context from knowledge base:
 
 
 
+
+
+
+
+
+
+
+
 # ---------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -5704,7 +11499,23 @@ Context from knowledge base:
 
 
 
+
+
+
+
+
+
+
+
 def admin_analytics(
+
+
+
+
+
+
+
+
 
 
 
@@ -5720,7 +11531,23 @@ def admin_analytics(
 
 
 
+
+
+
+
+
+
+
+
         get_current_admin
+
+
+
+
+
+
+
+
 
 
 
@@ -5736,7 +11563,31 @@ def admin_analytics(
 
 
 
+
+
+
+
+
+
+
+
 ):
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -5768,7 +11619,31 @@ def admin_analytics(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         raise HTTPException(
+
+
+
+
+
+
+
+
 
 
 
@@ -5784,6 +11659,14 @@ def admin_analytics(
 
 
 
+
+
+
+
+
+
+
+
             detail="Sheet not connected"
 
 
@@ -5792,7 +11675,31 @@ def admin_analytics(
 
 
 
+
+
+
+
+
+
+
+
         )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -5824,7 +11731,39 @@ def admin_analytics(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         rows = sheet.get_all_records()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -5848,6 +11787,14 @@ def admin_analytics(
 
 
 
+
+
+
+
+
+
+
+
             rows,
 
 
@@ -5856,7 +11803,23 @@ def admin_analytics(
 
 
 
-            ALLOWED_EMAILS
+
+
+
+
+
+
+
+
+            current_allowed_emails()
+
+
+
+
+
+
+
+
 
 
 
@@ -5865,6 +11828,22 @@ def admin_analytics(
 
 
         )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -5896,7 +11875,39 @@ def admin_analytics(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     except Exception as e:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -5920,7 +11931,23 @@ def admin_analytics(
 
 
 
+
+
+
+
+
+
+
+
             status_code=500,
+
+
+
+
+
+
+
+
 
 
 
@@ -5936,7 +11963,23 @@ def admin_analytics(
 
 
 
+
+
+
+
+
+
+
+
                 "Failed to compute analytics: "
+
+
+
+
+
+
+
+
 
 
 
@@ -5952,7 +11995,23 @@ def admin_analytics(
 
 
 
+
+
+
+
+
+
+
+
             )
+
+
+
+
+
+
+
+
 
 
 
@@ -5968,7 +12027,19 @@ def admin_analytics(
 
 
 
+
+
+
+
+
+
+
+
 # ---------------------------------------------------------------------------
+
+
+
+
 
 
 
@@ -5976,7 +12047,19 @@ def admin_analytics(
 
 
 
+
+
+
+
 # ---------------------------------------------------------------------------
+
+
+
+
+
+
+
+
 
 
 
@@ -5986,54 +12069,106 @@ def admin_analytics(
 
 @app.get("/admin/sessions")
 
+
+
 def admin_sessions(current_admin: str = Depends(get_current_admin)):
+
+
 
     now = datetime.datetime.now(datetime.timezone.utc)
 
+
+
     sessions = []
+
+
 
     with participant_sessions_lock:
 
+
+
         records = [dict(item) for item in participant_sessions.values()]
+
+
 
     for record in records:
 
+
+
         login_time = str(record.get("login_time", "")).strip()
+
+
 
         last_activity = str(record.get("last_activity", "")).strip()
 
+
+
         login_dt = parse_iso_datetime(login_time)
+
+
 
         activity_dt = parse_iso_datetime(last_activity)
 
+
+
         duration_seconds = max(0, int((activity_dt - login_dt).total_seconds())) if login_dt and activity_dt else 0
 
+
+
         status = "Ended"
+
         explicitly_ended = bool(record.get("ended_at"))
+
         if activity_dt and not explicitly_ended:
+
             if activity_dt.tzinfo is None:
+
                 activity_dt = activity_dt.replace(tzinfo=datetime.timezone.utc)
+
             if max(0, (now - activity_dt).total_seconds()) <= ACTIVE_SESSION_WINDOW_SECONDS:
+
                 status = "Active"
+
+
 
         sessions.append({
 
+
+
             "email": str(record.get("email", "")).strip().lower(),
+
+
 
             "session_id": str(record.get("session_id", "")).strip(),
 
+
+
             "login_time": login_time, "last_activity": last_activity,
+
+
 
             "duration_seconds": duration_seconds,
 
+
+
             "message_count": int(record.get("message_count", 0) or 0),
+
+
 
             "status": status,
 
+
+
         })
+
+
 
     sessions.sort(key=lambda item: item.get("login_time", ""), reverse=True)
 
+
+
     return {"sessions": sessions}
+
+
 
 

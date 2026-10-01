@@ -2667,7 +2667,38 @@ def end_participant_session(email: str):
         session = max(matching, key=lambda x: x.get("login_time", ""))
         session["last_activity"] = now
         session["ended_at"] = now
+@app.post("/auth/logout")
+def logout(payload: dict = Depends(get_token_payload)):
+    """Log out the current user and end a participant session."""
+    email = (payload.get("email") or "").strip().lower()
+    role = payload.get("role")
 
+    if role == "user":
+        if email not in ALLOWED_EMAILS:
+            raise HTTPException(
+                status_code=401,
+                detail="Not authorized"
+            )
+
+        end_participant_session(email)
+
+    elif role == "admin":
+        if email not in ADMIN_EMAILS:
+            raise HTTPException(
+                status_code=403,
+                detail="Admin access required"
+            )
+
+    else:
+        raise HTTPException(
+            status_code=401,
+            detail="Not authorized"
+        )
+
+    return {
+        "status": "success",
+        "message": "Logged out"
+    }
 
 def init_google_sheets():
 

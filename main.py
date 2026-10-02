@@ -2018,7 +2018,7 @@ def normalize_email(value: str) -> str:
 
 def is_valid_email(value: str) -> bool:
 
-    return bool(re.fullmatch(r"[^@\s]+@[^@\s]+\\.[^@\s]+", normalize_email(value)))
+    return bool(re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", normalize_email(value)))
 
 
 

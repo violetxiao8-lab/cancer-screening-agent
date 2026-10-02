@@ -16,3 +16,4 @@ gspread
 google-auth
 pyjwt
 requests
+python-pptx
